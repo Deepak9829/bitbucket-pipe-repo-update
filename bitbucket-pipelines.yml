@@ -1,0 +1,35 @@
+clone:
+  depth: 1
+image: node:10.15.0
+
+definitions:
+  services:
+    docker:
+      memory: 1536
+
+definition:
+  - step: &DockerBuild
+      name: Build and push to bitbucket-flux-pipe-deploy
+      image: python:3.7.4-alpine3.10
+      script:
+        - pip3 install awscli
+        - IMAGE="$Docker_ECR_Public"
+        - docker build -t $IMAGE:$BITBUCKET_TAG .
+        - docker tag $IMAGE:$BITBUCKET_TAG public.ecr.aws/d4p7d8l4/bitbucket-flux-pipe-deploy:$BITBUCKET_TAG
+        - aws configure set aws_access_key_id "${ECR_AWS_ACCESS_KEY_ID}"
+        - aws configure set aws_secret_access_key "${ECR_AWS_SECRET_ACCESS_KEY}"
+        - aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/d4p7d8l4
+        - docker push public.ecr.aws/d4p7d8l4/bitbucket-flux-pipe-deploy:$BITBUCKET_TAG
+        - echo "bitbucket-flux-pipe-deploy Build pushed =>"$IMAGE:$BITBUCKET_TAG
+      services:
+        - docker
+      caches:
+        - pip
+        - docker
+pipelines:
+  tags:
+    "*":
+      - step: *DockerBuild
+options:
+  docker: true
+  size: 2x
